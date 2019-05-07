@@ -1,0 +1,15 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Resources:
+
+  SimpleVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 192.168.0.0/16
+      EnableDnsSupport: false #default -> true
+      EnableDnsHostnames: false #default -> false
+      InstanceTenancy: 'default'
+      Tags:
+        -
+         Key: SampleTag
+         Value: !Join ['', [!Ref "AWS::StackName", "-VPC" ]]
