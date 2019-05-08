@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  PrivateVPCId:
+    Description: lorem ipsum
+    Type: String
+  PublicVPCId:
+    Description: lorem ipsum
+    Type: String
+  InstanceType:
+    Description: lorem ipsum
+    Type: String
+  PrivateSubnet:
+    Description: lorem ipsum
+    Type: String
+  PublicSubnet:
+    Description: lorem ipsum
+    Type: String
+  EC2KeyPairName:
+    Description: lorem ipsum
+    Type: String
+
+Mappings:
+  AWSRegionToAMI:
+    us-east-1:
+      '64': ami-0ff8a91507f77f867
+    us-west-2:
+      '64': ami-a0cfeed8
+    us-west-1:
+      '64': ami-0bdb828fd58c52235
+    eu-west-1:
+      '64': ami-047bb4163c506cd98
+    ap-southeast-1:
+      '64': ami-08569b978cc4dfa10
+    ap-southeast-2:
+      '64': ami-09b42976632b27e9b
+    ap-northeast-1:
+      '64': ami-06cd52961ce9f0d85
+    sa-east-1:
+      '64': ami-07b14488da8ea02a0
+
+Resources:
+
+  PublicSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Public instance security group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 192.168.1.0/24
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+      VpcId: !Ref PublicVPCId
+
+  PrivateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private instance security group
+      SecurityGroupIngress:
+      - IpProtocol: "-1"
+        FromPort: '0'
+        ToPort: '65535'
+        CidrIp: 10.0.1.0/24
+      - IpProtocol: "-1"
+        FromPort: '0'
+        ToPort: '65535'
+        CidrIp: 192.168.1.0/24
+      VpcId: !Ref PrivateVPCId
+
+  PrivateInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      SecurityGroupIds:
+      - !Ref PrivateSecurityGroup
+      SubnetId: !Ref PrivateSubnet
+      KeyName: !Ref EC2KeyPairName
+      ImageId:
+        Fn::FindInMap:
+        - AWSRegionToAMI
+        - !Ref AWS::Region
+        - '64'
+
+  PublicInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: 'true'
+          DeviceIndex: '0'
+          GroupSet:
+            - Ref: PublicSecurityGroup
+          SubnetId:
+            Ref: PublicSubnet
+      KeyName: !Ref EC2KeyPairName
+      ImageId:
+        Fn::FindInMap:
+        - AWSRegionToAMI
+        - !Ref AWS::Region
+        - '64'

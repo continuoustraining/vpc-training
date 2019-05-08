@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  EC2KeyPairName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+    Default: rstaging
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t1.micro
+    AllowedValues:
+    - t1.micro
+    - m1.small
+    - m3.medium
+    - m3.large
+    - m3.xlarge
+    - m3.2xlarge
+    - c3.large
+    - c3.xlarge
+    - c3.2xlarge
+    - c3.4xlarge
+    - c3.8xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+Conditions:
+  RunCondition:
+    Fn::Equals:
+    - 'false'
+    - 'true'
+Resources:
+  PublicVpcStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/raphael-cphp/bepark/b4fd19eb346d33492cd0e4a5a64e61db.template
+  PrivateVpcStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/raphael-cphp/bepark/df4e68e5391a1276aa6b571bb2118634.template
+  SimpleNetworkAcl:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId:
+        Fn::GetAtt:
+        - PublicVpcStack
+        - Outputs.Vpc
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ACL-${AWS::StackName}
+  SimpleNetworkAclEntry:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock:
+        Fn::GetAtt:
+        - PublicVpcStack
+        - Outputs.CidrBlock
+      Egress: false
+      Icmp:
+        Code: -1
+        Type: -1
+      NetworkAclId:
+        Ref: SimpleNetworkAcl
+      PortRange:
+        From: 22
+        To: 443
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 1
+  PeeringStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/raphael-cphp/bepark/b29575c91880326e870f5500a0612e0a.template
+      Parameters:
+        SimplePublicVPC:
+          Fn::GetAtt:
+          - PublicVpcStack
+          - Outputs.Vpc
+        PublicRouteTable:
+          Fn::GetAtt:
+          - PublicVpcStack
+          - Outputs.RouteTable
+        SimplePrivateVPC:
+          Fn::GetAtt:
+          - PrivateVpcStack
+          - Outputs.Vpc
+        PrivateRouteTable:
+          Fn::GetAtt:
+          - PrivateVpcStack
+          - Outputs.RouteTable
+  Ec2Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/raphael-cphp/bepark/95f169b2b64d66a5ce37744798d1a693.template
+      Parameters:
+        PrivateVPCId:
+          Fn::GetAtt:
+          - PrivateVpcStack
+          - Outputs.Vpc
+        PublicVPCId:
+          Fn::GetAtt:
+          - PublicVpcStack
+          - Outputs.Vpc
+        PrivateSubnet:
+          Fn::GetAtt:
+          - PrivateVpcStack
+          - Outputs.Subnet
+        PublicSubnet:
+          Fn::GetAtt:
+          - PublicVpcStack
+          - Outputs.Subnet
+        EC2KeyPairName:
+          Ref: EC2KeyPairName
+        InstanceType:
+          Ref: InstanceType

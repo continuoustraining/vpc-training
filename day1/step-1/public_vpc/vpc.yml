@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Resources:
+
+  SimplePublicVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 192.168.0.0/16
+      EnableDnsSupport: false #default -> true
+      EnableDnsHostnames: false #default -> false
+      InstanceTenancy: 'default'
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "AWS::StackName", "-PublicVPC" ]]
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref SimplePublicVPC
+      CidrBlock: 192.168.1.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]    # Get the first AZ in the list
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName}-Public
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref SimplePublicVPC
+      Tags:
+        - Key: Name
+          Value: Public route table
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+
+  PublicRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref SimplePublicVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  SimpleNATGateway:
+    Type: AWS::EC2::NatGateway
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      AllocationId: !GetAtt ElasticIPAddress.AllocationId
+      SubnetId: !Ref PublicSubnet
+      Tags:
+      - Key: Name
+        Value: !Sub NAT-${AWS::StackName}
+
+  ElasticIPAddress:
+   Type: AWS::EC2::EIP
+   Properties:
+     Domain: SimplePublicVPC
+
+Outputs:
+  Vpc:
+    Description: VPC
+    Value: !Ref SimplePublicVPC
+  Subnet:
+    Description: Public subnet
+    Value: !Ref PublicSubnet
+  RouteTable:
+    Description: Public route table
+    Value: !Ref PublicRouteTable
+  CidrBlock:
+    Description: Public CIDR block
+    Value: !GetAtt SimplePublicVPC.CidrBlock

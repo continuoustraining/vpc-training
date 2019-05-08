@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  SimplePublicVPC:
+    Description: lorem ipsum
+    Type: String
+  SimplePrivateVPC:
+    Description: lorem ipsum
+    Type: String
+  PrivateRouteTable:
+    Description: lorem ipsum
+    Type: String
+  PublicRouteTable:
+    Description: lorem ipsum
+    Type: String
+
+Resources:
+
+  SimpleVPCPeering:
+   Type: AWS::EC2::VPCPeeringConnection
+   Properties:
+    PeerVpcId: !Ref SimplePublicVPC
+    Tags:
+      -
+        Key: Name
+        Value: !Join ['', [!Ref "AWS::StackName", "-VPCPeering" ]]
+    VpcId: !Ref SimplePrivateVPC
+
+  PrivatePeeringRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 192.168.0.0/16
+      RouteTableId:
+        Ref: PrivateRouteTable
+      VpcPeeringConnectionId:
+        Ref: SimpleVPCPeering
+
+  PublicPeeringRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 10.0.0.0/16
+      RouteTableId:
+        Ref: PublicRouteTable
+      VpcPeeringConnectionId:
+        Ref: SimpleVPCPeering

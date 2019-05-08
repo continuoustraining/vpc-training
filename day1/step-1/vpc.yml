@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  EC2KeyPairName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+    Default: rstaging
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t1.micro
+    AllowedValues:
+    - t1.micro
+    - m1.small
+    - m3.medium
+    - m3.large
+    - m3.xlarge
+    - m3.2xlarge
+    - c3.large
+    - c3.xlarge
+    - c3.2xlarge
+    - c3.4xlarge
+    - c3.8xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+
+Conditions:
+  RunCondition: !Equals [ 'false', 'true' ]
+
+Resources:
+
+  PublicVpcStack:
+    Condition: RunCondition
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./public_vpc/vpc.yml
+
+  PrivateVpcStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./private_vpc/vpc.yml
+
+  SimpleNetworkAcl:
+    Condition: RunCondition
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !GetAtt PublicVpcStack.Outputs.Vpc
+      Tags:
+      - Key: Name
+        Value: !Sub ACL-${AWS::StackName}
+
+  SimpleNetworkAclEntry:
+    Condition: RunCondition
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !GetAtt PublicVpcStack.Outputs.CidrBlock
+      Egress: false
+      Icmp:
+          Code: -1
+          Type: -1
+      NetworkAclId: !Ref SimpleNetworkAcl
+      PortRange:
+        From: 22
+        To: 443
+      Protocol: -1
+      RuleAction : allow
+      RuleNumber : 1
+
+  PeeringStack:
+    Condition: RunCondition
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./peering/peering.yml
+      Parameters:
+        SimplePublicVPC: !GetAtt PublicVpcStack.Outputs.Vpc
+        PublicRouteTable: !GetAtt PublicVpcStack.Outputs.RouteTable
+        SimplePrivateVPC: !GetAtt PrivateVpcStack.Outputs.Vpc
+        PrivateRouteTable: !GetAtt PrivateVpcStack.Outputs.RouteTable
+
+  Ec2Stack:
+    Condition: RunCondition
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:  ./instances/instances.yml
+      Parameters:
+        PrivateVPCId: !GetAtt PrivateVpcStack.Outputs.Vpc
+        PublicVPCId: !GetAtt PublicVpcStack.Outputs.Vpc
+        PrivateSubnet: !GetAtt PrivateVpcStack.Outputs.Subnet
+        PublicSubnet: !GetAtt PublicVpcStack.Outputs.Subnet
+        EC2KeyPairName: !Ref EC2KeyPairName
+        InstanceType: !Ref InstanceType
+

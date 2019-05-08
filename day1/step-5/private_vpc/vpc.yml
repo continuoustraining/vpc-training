@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Resources:
+  SimplePrivateVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: false #default -> true
+      EnableDnsHostnames: false #default -> false
+      InstanceTenancy: 'default'
+      Tags:
+      - Key: Name
+        Value: !Join ['', [!Ref "AWS::StackName", "-PrivateVPC" ]]
+
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref SimplePrivateVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]    # Get the first AZ in the list
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName}-Public-A
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref SimplePrivateVPC
+      Tags:
+      - Key: Name
+        Value: Private route table
+  PrivateRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet
+
+Outputs:
+  Vpc:
+    Description: VPC
+    Value: !Ref SimplePrivateVPC
+  Subnet:
+    Description: Public subnet
+    Value: !Ref PrivateSubnet
+  RouteTable:
+    Description: Public route table
+    Value: !Ref PrivateRouteTable
+  CidrBlock:
+    Description: Public CIDR block
+    Value: !GetAtt SimplePrivateVPC.CidrBlock
